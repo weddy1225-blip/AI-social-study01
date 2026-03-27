@@ -1,19 +1,31 @@
-/**
- * 校外教學大考驗 - Google Apps Script 後端程式碼
- * 功能：處理地圖點位的儲存 (doPost) 與 讀取 (doGet)
- */
+// Code.gs
 
-// 處理老師端傳來的「發布任務」請求
+// 處理 POST 請求：發布、更新、刪除
 function doPost(e) {
   try {
-    // 取得當前試算表的第一張工作表
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
     var payload = JSON.parse(e.postData.contents);
-    var dataArray = payload.data;
-    var customId = payload.customId; 
-    var timestamp = new Date();
+    var action = payload.action; 
+    var customId = payload.customId;
 
-    // 將每一筆任務點位寫入試算表
+    // 1. 如果是「發布」或「刪除」，先清空該 ID 在試算表中的舊資料（實現覆蓋更新）
+    if (action === "publish" || action === "delete") {
+      var data = sheet.getDataRange().getValues();
+      for (var i = data.length - 1; i >= 0; i--) {
+        if (data[i][0].toString() === customId) {
+          sheet.deleteRow(i + 1);
+        }
+      }
+    }
+
+    // 2. 如果只是要「刪除」，到此結束
+    if (action === "delete") {
+      return ContentService.createTextOutput(JSON.stringify({"status":"deleted"})).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 3. 寫入新資料 (發布/更新)
+    var dataArray = payload.data;
+    var timestamp = new Date();
     dataArray.forEach(function(item) {
       sheet.appendRow([
         customId, 
@@ -25,32 +37,23 @@ function doPost(e) {
         item.optA, 
         item.optB, 
         item.answer, 
-        item.placeName
+        item.placeName || ""
       ]);
     });
-    
-    // 回傳成功訊息
-    return ContentService.createTextOutput(JSON.stringify({
-      "status": "success", 
-      "gameId": customId
-    })).setMimeType(ContentService.MimeType.JSON);
 
+    return ContentService.createTextOutput(JSON.stringify({"status":"success", "gameId":customId})).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
-    // 發生錯誤時回傳錯誤訊息
-    return ContentService.createTextOutput(JSON.stringify({
-      "status": "error", 
-      "message": err.toString()
-    })).setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify({"status":"error", "message":err.toString()})).setMimeType(ContentService.MimeType.JSON);
   }
 }
 
-// 處理學生端傳來的「取得任務」請求
+// 處理 GET 請求：讓老師或學生讀取資料
 function doGet(e) {
   var targetId = e.parameter.gameId;
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
   var rows = sheet.getDataRange().getValues();
   
-  // 根據學生輸入的 gameId 篩選出對應的點位資料
+  // 篩選 ID 並轉換成前端需要的格式
   var gameData = rows.filter(r => r[0].toString() === targetId).map(r => ({
     type: r[2], 
     lat: r[3], 
@@ -58,10 +61,9 @@ function doGet(e) {
     text: r[5], 
     optA: r[6], 
     optB: r[7], 
-    answer: r[8]
+    answer: r[8],
+    placeName: r[9] || ""
   }));
-
-  // 將資料轉為 JSON 格式回傳給學生端
-  return ContentService.createTextOutput(JSON.stringify(gameData))
-    .setMimeType(ContentService.MimeType.JSON);
+  
+  return ContentService.createTextOutput(JSON.stringify(gameData)).setMimeType(ContentService.MimeType.JSON);
 }
