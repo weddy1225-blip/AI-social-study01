@@ -1,19 +1,25 @@
 <!DOCTYPE html><html lang="zh-TW"><head>
-    <meta charset="UTF-8"><title>🛠️ 老師端 - 校外教學路線製作</title>
+    <meta charset="UTF-8"><title>🛠️ 老師端 - 校外教學路線製作 (進階版)</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
-        body { font-family: sans-serif; display: flex; height: 100vh; margin: 0; background: #f4f4f4; }
+        body { font-family: '微軟正黑體', sans-serif; display: flex; height: 100vh; margin: 0; background: #f4f4f4; }
         #map { flex: 1; }
-        #panel { width: 380px; padding: 20px; background: white; overflow-y: auto; box-shadow: -2px 0 10px rgba(0,0,0,0.1); }
-        .control-group { background: #eee; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
-        input, select, textarea, button { width: 100%; margin-bottom: 10px; padding: 10px; box-sizing: border-box; }
-        button { cursor: pointer; border: none; border-radius: 5px; font-weight: bold; }
+        #panel { width: 400px; padding: 20px; background: white; overflow-y: auto; box-shadow: -2px 0 10px rgba(0,0,0,0.1); }
+        .control-group { background: #eee; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #ddd; }
+        h2, h3 { color: #333; margin-top: 0; }
+        input, select, textarea, button { width: 100%; margin-bottom: 10px; padding: 12px; box-sizing: border-box; border-radius: 5px; border: 1px solid #ccc; font-size: 14px; }
+        button { cursor: pointer; border: none; font-weight: bold; transition: 0.2s; }
+        button:hover { opacity: 0.8; }
         .btn-add { background: #4caf50; color: white; }
-        .btn-pub { background: #00d4ff; color: black; font-size: 18px; margin-top: 20px; }
+        .btn-pub { background: #00d4ff; color: black; font-size: 18px; margin-top: 20px; height: 60px; }
         .btn-load { background: #ff9800; color: white; }
         .btn-del { background: #f44336; color: white; }
-        .point-item { border-bottom: 1px solid #ddd; padding: 10px 0; font-size: 14px; }
+        .point-item { background: #fff; border: 1px solid #ddd; padding: 10px; margin-bottom: 8px; border-radius: 5px; cursor: pointer; position: relative; }
+        .point-item:hover { border-color: #00d4ff; background: #f0fbff; }
+        .point-item b { color: #2196f3; }
+        .del-sub-btn { position: absolute; right: 10px; top: 10px; background: #ff5252; color: white; padding: 2px 8px; font-size: 12px; }
+        .edit-hint { font-size: 12px; color: #666; margin-bottom: 10px; }
     </style>
 </head><body>
 
@@ -22,91 +28,102 @@
         <h2>🛠️ 路線製作控制台</h2>
         
         <div class="control-group">
-            <label>1. 遊戲 ID 管理</label>
-            <input type="text" id="customId" placeholder="輸入遊戲 ID (例如: text001)">
+            <label><b>1. 遊戲 ID 管理</b></label>
+            <input type="text" id="customId" placeholder="輸入遊戲 ID (如: text001)">
             <div style="display:flex; gap:5px;">
                 <button class="btn-load" onclick="loadExistingGame()">載入舊資料</button>
-                <button class="btn-del" onclick="deleteGame()">刪除 ID</button>
+                <button class="btn-del" onclick="deleteGame()">刪除整個 ID</button>
             </div>
         </div>
 
         <div id="editor" class="control-group">
-            <label>2. 新增點位 (在地圖點擊或搜尋)</label>
-            <input type="text" id="search" placeholder="搜尋地點 (例如: 台北車站)" onchange="geoSearch()">
-            <input type="text" id="curName" placeholder="地點名稱">
+            <label><b>2. 編輯點位資訊</b></label>
+            <p class="edit-hint">※ 在地圖點擊選位，或點擊下方清單進行修改</p>
+            <input type="text" id="curName" placeholder="地點名稱 (必填)">
             <select id="curType" onchange="toggleFields()">
                 <option value="start">🚩 冒險起點 (Start)</option>
                 <option value="task">❓ 任務點 (Task)</option>
                 <option value="end">🏁 冒險終點 (End)</option>
             </select>
-            <textarea id="curText" placeholder="對話內容或題目"></textarea>
+            <textarea id="curText" placeholder="對話內容或題目說明..." rows="3"></textarea>
+            
             <div id="taskFields" style="display:none;">
-                <input type="text" id="optA" placeholder="選項 A">
-                <input type="text" id="optB" placeholder="選項 B">
+                <div style="display:flex; gap:5px;">
+                    <input type="text" id="optA" placeholder="選項 A">
+                    <input type="text" id="optB" placeholder="選項 B">
+                </div>
                 <select id="ans">
                     <option value="A">正確答案：A</option>
                     <option value="B">正確答案：B</option>
                 </select>
             </div>
-            <button class="btn-add" onclick="addPoint()">加入路線</button>
+            <input type="hidden" id="curLat"><input type="hidden" id="curLng">
+            <button class="btn-add" id="addBtn" onclick="addOrUpdatePoint()">加入 / 更新至清單</button>
         </div>
 
-        <h3>📍 已加入點位</h3>
+        <h3>📍 已設定點位 (點擊可修改)</h3>
         <div id="pointList"></div>
-        <button class="btn-pub" onclick="publishGame()">🚀 發布 / 更新遊戲</button>
+        <button class="btn-pub" onclick="publishGame()">🚀 發布 / 覆蓋更新遊戲</button>
     </div>
 
     <script>
-        const gasUrl = 'https://script.google.com/macros/s/AKfycbzQZVw5zKIH1pgtJTZjEuk1o15y2Z1HsOfaDd1R3OGM-S9t5_rK2hFkJ6-Woii5DXdF/exec'; // 👈 記得填入
+        const gasUrl = 'https://script.google.com/macros/s/AKfycbzQZVw5zKIH1pgtJTZjEuk1o15y2Z1HsOfaDd1R3OGM-S9t5_rK2hFkJ6-Woii5DXdF/exec'; // 👈 請填入您的 GAS 網址
         const map = L.map('map').setView([25.04, 121.51], 13);
         L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
         let points = [];
         let markers = [];
-        let tempMarker = null;
+        let editingIndex = -1; // 追蹤目前是否在修改舊點位
 
+        // 地圖點擊：設定座標並填入
         map.on('click', e => {
             const { lat, lng } = e.latlng;
-            setTempMarker(lat, lng, "自選地點");
+            document.getElementById('curLat').value = lat;
+            document.getElementById('curLng').value = lng;
+            document.getElementById('curName').value = "自選地點";
+            editingIndex = -1;
+            document.getElementById('addBtn').innerText = "加入路線";
+            alert("已在地圖選取座標，請繼續填寫題目內容。");
         });
-
-        function geoSearch() {
-            const q = document.getElementById('search').value;
-            fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${q}`)
-                .then(r => r.json()).then(res => {
-                    if(res.length > 0) {
-                        const { lat, lon, display_name } = res[0];
-                        map.setView([lat, lon], 16);
-                        setTempMarker(lat, lon, display_name);
-                    }
-                });
-        }
-
-        function setTempMarker(lat, lng, name) {
-            if(tempMarker) map.removeLayer(tempMarker);
-            tempMarker = L.marker([lat, lng], {draggable: true}).addTo(map).bindPopup("新點位預覽").openPopup();
-            document.getElementById('curName').value = name.split(',')[0];
-        }
 
         function toggleFields() {
             document.getElementById('taskFields').style.display = document.getElementById('curType').value === 'task' ? 'block' : 'none';
         }
 
-        function addPoint() {
-            if(!tempMarker) return alert("請先在地圖上選點");
-            const pos = tempMarker.getLatLng();
+        // 加入或更新點位
+        function addOrUpdatePoint() {
+            const lat = document.getElementById('curLat').value;
+            if(!lat) return alert("請先在地圖上點擊位置！");
+
             const p = {
                 type: document.getElementById('curType').value,
-                lat: pos.lat, lng: pos.lng,
+                lat: parseFloat(lat),
+                lng: parseFloat(document.getElementById('curLng').value),
                 placeName: document.getElementById('curName').value,
                 text: document.getElementById('curText').value,
                 optA: document.getElementById('optA').value,
                 optB: document.getElementById('optB').value,
                 answer: document.getElementById('ans').value
             };
-            points.push(p);
+
+            if (editingIndex > -1) {
+                points[editingIndex] = p;
+                editingIndex = -1;
+                document.getElementById('addBtn').innerText = "加入路線";
+            } else {
+                points.push(p);
+            }
+            
+            clearEditor();
             renderList();
-            map.removeLayer(tempMarker); tempMarker = null;
+        }
+
+        function clearEditor() {
+            document.getElementById('curName').value = "";
+            document.getElementById('curText').value = "";
+            document.getElementById('optA').value = "";
+            document.getElementById('optB').value = "";
+            document.getElementById('curLat').value = "";
         }
 
         function renderList() {
@@ -118,12 +135,35 @@
             points.forEach((p, i) => {
                 const div = document.createElement('div');
                 div.className = 'point-item';
-                div.innerHTML = `<b>${i+1}. [${p.type}]</b> ${p.placeName} <button onclick="points.splice(${i},1);renderList()" style="width:auto; padding:2px 5px;">刪除</button>`;
+                div.onclick = () => editPoint(i);
+                div.innerHTML = `
+                    <b>${i+1}. [${p.type.toUpperCase()}]</b> ${p.placeName || '未命名'}<br>
+                    <small>${p.text.substring(0, 20)}...</small>
+                    <button class="del-sub-btn" onclick="event.stopPropagation(); points.splice(${i},1); renderList();">刪除</button>
+                `;
                 list.appendChild(div);
                 
                 const m = L.marker([p.lat, p.lng]).addTo(map).bindPopup(`${i+1}. ${p.placeName}`);
                 markers.push(m);
             });
+        }
+
+        // 點擊清單項目：把資料填回編輯區
+        function editPoint(index) {
+            editingIndex = index;
+            const p = points[index];
+            document.getElementById('curName').value = p.placeName;
+            document.getElementById('curType').value = p.type;
+            document.getElementById('curText').value = p.text;
+            document.getElementById('optA').value = p.optA;
+            document.getElementById('optB').value = p.optB;
+            document.getElementById('ans').value = p.answer;
+            document.getElementById('curLat').value = p.lat;
+            document.getElementById('curLng').value = p.lng;
+            document.getElementById('addBtn').innerText = "確認修改點位";
+            toggleFields();
+            map.panTo([p.lat, p.lng]);
+            alert(`已載入「${p.placeName}」的資料，修改後請按更新按鈕。`);
         }
 
         function loadExistingGame() {
@@ -133,7 +173,7 @@
                 if(data.length === 0) return alert("找不到資料");
                 points = data;
                 renderList();
-                alert("載入成功，現在可以編輯後重新發布。");
+                alert("載入成功！點擊下方清單即可修改題目。");
             });
         }
 
@@ -141,14 +181,14 @@
             const id = document.getElementById('customId').value;
             if(!id || !confirm("確定刪除此 ID 的所有資料？")) return;
             fetch(gasUrl, { method: 'POST', body: JSON.stringify({ action: "delete", customId: id }) })
-            .then(r => r.json()).then(() => { alert("已刪除"); location.reload(); });
+            .then(r => r.json()).then(() => { alert("已從雲端刪除"); location.reload(); });
         }
 
         function publishGame() {
             const id = document.getElementById('customId').value;
             if(!id || points.length === 0) return alert("請填寫 ID 並至少加入一個點位");
             fetch(gasUrl, { method: 'POST', body: JSON.stringify({ action: "publish", customId: id, data: points }) })
-            .then(r => r.json()).then(res => { if(res.status==="success") alert("🚀 遊戲已成功更新/發布！"); });
+            .then(r => r.json()).then(res => { if(res.status==="success") alert("🚀 遊戲已成功發布並儲存至試算表！"); });
         }
     </script>
 </body></html>
