@@ -1,0 +1,125 @@
+<!DOCTYPE html><html lang="zh-TW"><head>
+    <meta charset="UTF-8"><title>教師建置後台 - 防呆強化版</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        body { margin: 0; display: flex; height: 100vh; font-family: sans-serif; background: #f4f7f6; }
+        #map { flex: 1; }
+        #sidebar { width: 400px; padding: 20px; background: white; overflow-y: auto; box-shadow: -2px 0 10px rgba(0,0,0,0.1); }
+        .section { background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 20px; }
+        label { font-weight: bold; font-size: 14px; display: block; margin-top: 10px; }
+        input, select, textarea { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; margin-top: 10px; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        .btn-search { background: #6c757d; color: white; }
+        .btn-add { background: #007bff; color: white; }
+        .btn-publish { background: #28a745; color: white; font-size: 18px; }
+        .point-item { background: #f9f9f9; padding: 10px; margin-top: 8px; border-left: 5px solid #007bff; font-size: 12px; }
+    </style>
+</head><body>
+    <div id="map"></div>
+    <div id="sidebar">
+        <div class="section">
+            <h3 style="margin-top:0;">🔍 1. 搜尋地點</h3>
+            <input type="text" id="addrInput" placeholder="輸入地址或地標">
+            <button class="btn-search" onclick="searchAddr()">搜尋</button>
+        </div>
+
+        <div id="formArea" class="section" style="display:none; border-color: #007bff;">
+            <h3 style="margin-top:0;">📍 2. 設定任務</h3>
+            <label>地名/座標</label>
+            <input type="text" id="placeName" readonly style="background:#eee; font-size:11px;">
+            <input type="text" id="coord" readonly style="background:#eee;">
+            
+            <label>點位類型</label>
+            <select id="pointType" onchange="toggleOptions()">
+                <option value="start">🚩 起點 (僅顯示說明)</option>
+                <option value="task">❓ 任務點 (需設定題目)</option>
+                <option value="end">🏁 終點 (僅顯示說明)</option>
+            </select>
+
+            <label>內容文字</label>
+            <textarea id="taskText" rows="2" placeholder="請輸入對話或題目內容"></textarea>
+
+            <div id="taskOptions" style="display:none; margin-top:10px; padding:10px; background:#eef6ff; border-radius:5px;">
+                <label>選項 A</label><input type="text" id="optA">
+                <label>選項 B</label><input type="text" id="optB">
+                <label>正確答案</label>
+                <select id="answer"><option value="A">A</option><option value="B">B</option></select>
+            </div>
+            
+            <button class="btn-add" onclick="addPoint()">加入清單</button>
+        </div>
+
+        <div class="section">
+            <h3 style="margin-top:0;">🚀 3. 發布</h3>
+            <label>自訂遊戲 ID</label>
+            <input type="text" id="customId" placeholder="例如: 4A01">
+            <button class="btn-publish" onclick="publish()">正式發布遊戲</button>
+            <div id="pointList"></div>
+        </div>
+    </div>
+
+    <script>
+        const gasUrl = 'https://script.google.com/macros/s/AKfycbzQZVw5zKIH1pgtJTZjEuk1o15y2Z1HsOfaDd1R3OGM-S9t5_rK2hFkJ6-Woii5DXdF/exec'; 
+        const map = L.map('map').setView([25.04, 121.51], 13);
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        let currentMarker = null, gameData = [];
+
+        function toggleOptions() {
+            const isTask = document.getElementById('pointType').value === 'task';
+            document.getElementById('taskOptions').style.display = isTask ? 'block' : 'none';
+        }
+
+        function searchAddr() {
+            const q = document.getElementById('addrInput').value;
+            fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}`)
+            .then(r => r.json()).then(data => {
+                if(data.length > 0) {
+                    const res = data[0];
+                    map.flyTo([res.lat, res.lon], 17);
+                    handleMapClick({ latlng: { lat: parseFloat(res.lat), lng: parseFloat(res.lon) } });
+                    document.getElementById('placeName').value = res.display_name;
+                }
+            });
+        }
+
+        function handleMapClick(e) {
+            const lat = e.latlng.lat.toFixed(6), lng = e.latlng.lng.toFixed(6);
+            if (currentMarker) map.removeLayer(currentMarker);
+            currentMarker = L.marker([lat, lng]).addTo(map);
+            document.getElementById('formArea').style.display = 'block';
+            document.getElementById('coord').value = `${lat}, ${lng}`;
+            toggleOptions();
+        }
+        map.on('click', handleMapClick);
+
+        function addPoint() {
+            const type = document.getElementById('pointType').value;
+            const isTask = (type === 'task');
+            gameData.push({
+                type: type,
+                lat: document.getElementById('coord').value.split(',')[0],
+                lng: document.getElementById('coord').value.split(',')[1],
+                text: document.getElementById('taskText').value,
+                optA: isTask ? document.getElementById('optA').value : "確定",
+                optB: isTask ? document.getElementById('optB').value : "",
+                answer: isTask ? document.getElementById('answer').value : "A",
+                placeName: document.getElementById('placeName').value
+            });
+            renderList();
+            document.getElementById('formArea').style.display = 'none';
+            if(currentMarker) map.removeLayer(currentMarker);
+        }
+
+        function renderList() {
+            document.getElementById('pointList').innerHTML = gameData.map((p, i) => `<div class="point-item"><b>${i+1}. [${p.type}]</b> ${p.text.substring(0,15)}...</div>`).join('');
+        }
+
+        function publish() {
+            const cId = document.getElementById('customId').value.trim();
+            if(!cId || gameData.length === 0) return alert("請輸入 ID 並新增點位");
+            fetch(gasUrl, { method: 'POST', body: JSON.stringify({ customId: cId, data: gameData }) })
+            .then(r => r.json()).then(d => alert("成功！ID: " + d.gameId));
+        }
+    </script>
+</body></html>

@@ -1,0 +1,30 @@
+// Code.gs
+function doPost(e) {
+  try {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    var payload = JSON.parse(e.postData.contents);
+    var dataArray = payload.data;
+    var customId = payload.customId; 
+    var timestamp = new Date();
+
+    dataArray.forEach(function(item) {
+      sheet.appendRow([
+        customId, timestamp, item.type, item.lat, item.lng, 
+        item.text, item.optA, item.optB, item.answer, item.placeName
+      ]);
+    });
+    return ContentService.createTextOutput(JSON.stringify({"status":"success", "gameId":customId})).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({"status":"error", "message":err.toString()})).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function doGet(e) {
+  var targetId = e.parameter.gameId;
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var rows = sheet.getDataRange().getValues();
+  var gameData = rows.filter(r => r[0].toString() === targetId).map(r => ({
+    type: r[2], lat: r[3], lng: r[4], text: r[5], optA: r[6], optB: r[7], answer: r[8]
+  }));
+  return ContentService.createTextOutput(JSON.stringify(gameData)).setMimeType(ContentService.MimeType.JSON);
+}
