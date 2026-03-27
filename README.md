@@ -8,10 +8,10 @@
 
 現在趕快開始進行校外教學大考驗吧：
 
-* **🛠️ 老師端：製作路線** [點此進入老師後台](https://你的GitHub帳號.github.io/專案名稱/admin.html)  
+* **🛠️ 老師端：製作路線** [點此進入老師後台](https://weddy1225-blip.github.io/AI-social-study01/admin.html)  
   *(功能：搜尋地點、設定題目、發布遊戲 ID)*
 
-* **🎮 學生端：遊戲開始** [點此進入學生遊戲](https://你的GitHub帳號.github.io/專案名稱/game.html)  
+* **🎮 學生端：遊戲開始** [點此進入學生遊戲](https://weddy1225-blip.github.io/AI-social-study01/game.html)  
   *(功能：自動導航、隨機任務挑戰、積分結算)*
 
 > **小撇步**：學生進入遊戲後，若想先熟悉操作，可以直接點選「試玩模式」進入預設的 `text001` 挑戰！
