@@ -1,5 +1,5 @@
 <!DOCTYPE html><html lang="zh-TW"><head>
-    <meta charset="UTF-8"><title>🛠️ 老師端 - 校外教學路線製作 (進階版)</title>
+    <meta charset="UTF-8"><title>🛠️ 老師端 - 校外教學路線製作 (自動定位版)</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
@@ -17,9 +17,9 @@
         .btn-del { background: #f44336; color: white; }
         .point-item { background: #fff; border: 1px solid #ddd; padding: 10px; margin-bottom: 8px; border-radius: 5px; cursor: pointer; position: relative; }
         .point-item:hover { border-color: #00d4ff; background: #f0fbff; }
-        .point-item b { color: #2196f3; }
         .del-sub-btn { position: absolute; right: 10px; top: 10px; background: #ff5252; color: white; padding: 2px 8px; font-size: 12px; }
         .edit-hint { font-size: 12px; color: #666; margin-bottom: 10px; }
+        .loading-text { font-size: 12px; color: #2196f3; display: none; margin-bottom: 5px; }
     </style>
 </head><body>
 
@@ -29,7 +29,7 @@
         
         <div class="control-group">
             <label><b>1. 遊戲 ID 管理</b></label>
-            <input type="text" id="customId" placeholder="輸入遊戲 ID (如: text001)">
+            <input type="text" id="customId" placeholder="輸入遊戲 ID">
             <div style="display:flex; gap:5px;">
                 <button class="btn-load" onclick="loadExistingGame()">載入舊資料</button>
                 <button class="btn-del" onclick="deleteGame()">刪除整個 ID</button>
@@ -38,8 +38,11 @@
 
         <div id="editor" class="control-group">
             <label><b>2. 編輯點位資訊</b></label>
-            <p class="edit-hint">※ 在地圖點擊選位，或點擊下方清單進行修改</p>
-            <input type="text" id="curName" placeholder="地點名稱 (必填)">
+            <p class="edit-hint">※ 輸入名稱後按 Enter 或點擊地圖皆可定位</p>
+            
+            <div id="searchStatus" class="loading-text">正在搜尋座標...</div>
+            <input type="text" id="curName" placeholder="地點名稱 (輸入後按 Enter 自動定位)" onchange="autoGeoSearch()">
+            
             <select id="curType" onchange="toggleFields()">
                 <option value="start">🚩 冒險起點 (Start)</option>
                 <option value="task">❓ 任務點 (Task)</option>
@@ -73,27 +76,55 @@
 
         let points = [];
         let markers = [];
-        let editingIndex = -1; // 追蹤目前是否在修改舊點位
+        let editingIndex = -1;
+        let tempMarker = null;
 
-        // 地圖點擊：設定座標並填入
+        // 地圖點擊定位
         map.on('click', e => {
             const { lat, lng } = e.latlng;
-            document.getElementById('curLat').value = lat;
-            document.getElementById('curLng').value = lng;
-            document.getElementById('curName').value = "自選地點";
+            updatePosition(lat, lng);
             editingIndex = -1;
             document.getElementById('addBtn').innerText = "加入路線";
-            alert("已在地圖選取座標，請繼續填寫題目內容。");
         });
+
+        // 修正 2：自動地理搜尋功能
+        function autoGeoSearch() {
+            const query = document.getElementById('curName').value;
+            if(!query || query === "自選地點") return;
+
+            const status = document.getElementById('searchStatus');
+            status.style.display = "block";
+
+            fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}`)
+                .then(r => r.json())
+                .then(res => {
+                    status.style.display = "none";
+                    if(res && res.length > 0) {
+                        const { lat, lon } = res[0];
+                        updatePosition(parseFloat(lat), parseFloat(lon));
+                        map.flyTo([lat, lon], 17);
+                    } else {
+                        console.log("找不到該地點座標，請手動點擊地圖。");
+                    }
+                })
+                .catch(() => status.style.display = "none");
+        }
+
+        function updatePosition(lat, lng) {
+            document.getElementById('curLat').value = lat;
+            document.getElementById('curLng').value = lng;
+            
+            if(tempMarker) map.removeLayer(tempMarker);
+            tempMarker = L.circleMarker([lat, lng], { color: '#ff5722', radius: 10 }).addTo(map);
+        }
 
         function toggleFields() {
             document.getElementById('taskFields').style.display = document.getElementById('curType').value === 'task' ? 'block' : 'none';
         }
 
-        // 加入或更新點位
         function addOrUpdatePoint() {
             const lat = document.getElementById('curLat').value;
-            if(!lat) return alert("請先在地圖上點擊位置！");
+            if(!lat) return alert("請先定位地點！(輸入名稱或點擊地圖)");
 
             const p = {
                 type: document.getElementById('curType').value,
@@ -114,6 +145,7 @@
                 points.push(p);
             }
             
+            if(tempMarker) map.removeLayer(tempMarker);
             clearEditor();
             renderList();
         }
@@ -142,13 +174,11 @@
                     <button class="del-sub-btn" onclick="event.stopPropagation(); points.splice(${i},1); renderList();">刪除</button>
                 `;
                 list.appendChild(div);
-                
                 const m = L.marker([p.lat, p.lng]).addTo(map).bindPopup(`${i+1}. ${p.placeName}`);
                 markers.push(m);
             });
         }
 
-        // 點擊清單項目：把資料填回編輯區
         function editPoint(index) {
             editingIndex = index;
             const p = points[index];
@@ -158,12 +188,10 @@
             document.getElementById('optA').value = p.optA;
             document.getElementById('optB').value = p.optB;
             document.getElementById('ans').value = p.answer;
-            document.getElementById('curLat').value = p.lat;
-            document.getElementById('curLng').value = p.lng;
+            updatePosition(p.lat, p.lng);
             document.getElementById('addBtn').innerText = "確認修改點位";
             toggleFields();
             map.panTo([p.lat, p.lng]);
-            alert(`已載入「${p.placeName}」的資料，修改後請按更新按鈕。`);
         }
 
         function loadExistingGame() {
@@ -173,7 +201,7 @@
                 if(data.length === 0) return alert("找不到資料");
                 points = data;
                 renderList();
-                alert("載入成功！點擊下方清單即可修改題目。");
+                alert("載入成功！");
             });
         }
 
@@ -181,14 +209,14 @@
             const id = document.getElementById('customId').value;
             if(!id || !confirm("確定刪除此 ID 的所有資料？")) return;
             fetch(gasUrl, { method: 'POST', body: JSON.stringify({ action: "delete", customId: id }) })
-            .then(r => r.json()).then(() => { alert("已從雲端刪除"); location.reload(); });
+            .then(r => r.json()).then(() => { alert("已刪除"); location.reload(); });
         }
 
         function publishGame() {
             const id = document.getElementById('customId').value;
             if(!id || points.length === 0) return alert("請填寫 ID 並至少加入一個點位");
             fetch(gasUrl, { method: 'POST', body: JSON.stringify({ action: "publish", customId: id, data: points }) })
-            .then(r => r.json()).then(res => { if(res.status==="success") alert("🚀 遊戲已成功發布並儲存至試算表！"); });
+            .then(r => r.json()).then(res => { if(res.status==="success") alert("🚀 遊戲已成功更新！"); });
         }
     </script>
 </body></html>
