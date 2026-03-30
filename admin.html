@@ -1,222 +1,184 @@
-<!DOCTYPE html>
-<html lang="zh-Hant">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>全台旅遊大冒險 - 老師管理端</title>
-    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&libraries=places"></script>
+<!DOCTYPE html><html lang="zh-TW"><head>
+    <meta charset="UTF-8"><title>🛠️ 老師端 - 自動定位管理系統</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
-        body { font-family: "Microsoft JhengHei", sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; }
-        .container { max-width: 850px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        h2 { color: #2c3e50; text-align: center; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 0; }
+        body { font-family: '微軟正黑體', sans-serif; display: flex; height: 100vh; margin: 0; background: #f4f4f4; }
+        #map { flex: 1; }
+        #panel { width: 400px; padding: 20px; background: white; overflow-y: auto; box-shadow: -2px 0 10px rgba(0,0,0,0.1); }
+        .control-group { background: #eee; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #ddd; }
+        input, select, textarea, button { width: 100%; margin-bottom: 10px; padding: 12px; box-sizing: border-box; border-radius: 5px; border: 1px solid #ccc; }
+        button { cursor: pointer; border: none; font-weight: bold; }
+        .btn-add { background: #4caf50; color: white; }
+        .btn-pub { background: #00d4ff; color: black; font-size: 18px; height: 60px; margin-top: 10px; }
+        .btn-load { background: #ff9800; color: white; }
         
-        .form-section { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        .form-group { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; font-size: 14px; }
-        input, textarea, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; font-size: 14px; }
-        textarea { height: 100px; resize: vertical; }
-
-        #map { height: 350px; width: 100%; margin: 15px 0; border-radius: 10px; border: 1px solid #ddd; }
-
-        .btn-group { display: flex; gap: 10px; margin-top: 10px; }
-        button { flex: 1; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; transition: 0.3s; }
-        .add-btn { background-color: #4caf50; color: white; }
-        .add-btn:hover { background-color: #45a049; }
-        .save-btn { background-color: #2196f3; color: white; }
-        .save-btn:hover { background-color: #1e88e5; }
-
-        /* 點位清單樣式 - 修正溢出問題 */
-        .point-list { margin-top: 30px; border-top: 2px solid #eee; padding-top: 20px; }
+        /* 修正後的點位項目樣式 */
         .point-item { 
             background: #fff; 
             border: 1px solid #ddd; 
-            padding: 15px; 
-            margin-bottom: 12px; 
-            border-radius: 10px; 
+            padding: 12px; 
+            margin-bottom: 8px; 
+            border-radius: 5px; 
             cursor: pointer; 
             position: relative; 
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            transition: 0.2s;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            display: flex; 
+            align-items: flex-start;
+            min-height: 40px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
-        .point-item:hover { background: #f0f8ff; border-color: #00d4ff; }
-        .point-info { flex: 1; padding-right: 60px; word-break: break-all; }
-        .point-info b { color: #2c3e50; display: block; margin-bottom: 4px; }
-        .point-info span { font-size: 13px; color: #777; }
+        .point-item:hover { background: #f0f8ff; border-color: #2196f3; }
+        
+        /* 讓標題文字自動換行，並避開右側按鈕 */
+        .point-item b { 
+            font-size: 14px; 
+            line-height: 1.4; 
+            flex: 1; 
+            padding-right: 50px; /* 給刪除按鈕留空間 */
+            word-break: break-all;
+        }
 
+        /* 修正刪除按鈕位置與大小 */
         .del-sub-btn { 
             position: absolute; 
-            right: 12px; 
-            top: 15px; 
-            background: #ff5252; 
+            right: 8px; 
+            top: 10px; 
+            background: #f44336; 
             color: white; 
-            padding: 5px 10px; 
-            font-size: 12px; 
-            border-radius: 6px; 
-            border: none;
-            cursor: pointer;
-            z-index: 10;
+            padding: 4px 8px; 
+            font-size: 11px; 
+            border-radius: 3px; 
+            width: auto; /* 覆蓋全域按鈕的 100% 寬度 */
+            margin-bottom: 0;
+            line-height: 1;
         }
         .del-sub-btn:hover { background: #d32f2f; }
+
+        .search-hint { font-size: 12px; color: #2196f3; display: none; margin-bottom: 5px; }
     </style>
-</head>
-<body>
+</head><body>
 
-<div class="container">
-    <h2>📍 全台旅遊大冒險：題目編輯器</h2>
-    
-    <div class="form-section">
-        <div>
-            <div class="form-group">
-                <label>地點名稱 (輸入後按 Enter 定位)</label>
-                <input type="text" id="placeName" placeholder="例如：桃園國際機場" onkeypress="if(event.keyCode==13) searchPlace()">
-            </div>
-            <div class="form-group">
-                <label>選項 A (正確答案)</label>
-                <input type="text" id="optionA" placeholder="請輸入正確答案">
-            </div>
-            <div class="form-group">
-                <label>選項 B (似是而非的答案)</label>
-                <input type="text" id="optionB" placeholder="請輸入誘導性錯誤答案">
-            </div>
-            <div class="form-group">
-                <label>關卡類型</label>
-                <select id="pointType">
-                    <option value="Task">挑戰題目 (Task)</option>
-                    <option value="Start">遊戲起點 (Start)</option>
-                    <option value="End">遊戲終點 (End)</option>
-                </select>
-            </div>
+    <div id="map"></div>
+    <div id="panel">
+        <h2>🛠️ 路線管理控制台</h2>
+        <div class="control-group">
+            <label><b>1. 遊戲 ID 管理</b></label>
+            <input type="text" id="customId" placeholder="輸入遊戲 ID">
+            <button class="btn-load" onclick="loadExistingGame()">載入舊資料</button>
         </div>
-        <div>
-            <div class="form-group">
-                <label>題目內容 / 介紹詞 (3-4年級程度)</label>
-                <textarea id="placeDesc" placeholder="請輸入題目敘述..."></textarea>
+
+        <div class="control-group">
+            <label><b>2. 編輯點位</b></label>
+            <div id="searchStatus" class="search-hint">正在尋找地點座標...</div>
+            <input type="text" id="curName" placeholder="地點名稱 (輸入後按 Enter 自動定位)" onchange="autoGeoSearch()">
+            <select id="curType" onchange="toggleFields()">
+                <option value="start">🚩 冒險起點</option>
+                <option value="task">❓ 任務點</option>
+                <option value="end">🏁 冒險終點</option>
+            </select>
+            <textarea id="curText" placeholder="內容說明..." rows="3"></textarea>
+            <div id="taskFields" style="display:none;">
+                <input type="text" id="optA" placeholder="選項 A">
+                <input type="text" id="optB" placeholder="選項 B">
+                <select id="ans"><option value="A">答案 A</option><option value="B">答案 B</option></select>
             </div>
-            <div id="map"></div>
+            <input type="hidden" id="curLat"><input type="hidden" id="curLng">
+            <button class="btn-add" id="addBtn" onclick="addOrUpdatePoint()">加入 / 更新點位</button>
         </div>
+
+        <h3>📍 已設定清單</h3>
+        <div id="pointList"></div>
+        <button class="btn-pub" onclick="publishGame()">🚀 發布並儲存遊戲</button>
     </div>
 
-    <div class="btn-group">
-        <button class="add-btn" onclick="addPoint()">➕ 新增/更新點位</button>
-        <button class="save-btn" onclick="saveToCloud()">🚀 發布至 GAS 雲端</button>
-    </div>
+    <script>
+        const gasUrl = 'https://script.google.com/macros/s/AKfycbzQZVw5zKIH1pgtJTZjEuk1o15y2Z1HsOfaDd1R3OGM-S9t5_rK2hFkJ6-Woii5DXdF/exec';
+        const map = L.map('map').setView([25.04, 121.51], 13);
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-    <div class="point-list" id="pointList">
-        <h3>🚩 已設定的冒險路線</h3>
-        </div>
-</div>
+        let points = [], markers = [], editingIndex = -1, tempMarker = null;
 
-<script>
-    let map, marker, autocomplete;
-    let points = [];
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbzQZVw5zKIH1pgtJTZjEuk1o15y2Z1HsOfaDd1R3OGM-S9t5_rK2hFkJ6-Woii5DXdF/exec";
+        map.on('click', e => { updatePosition(e.latlng.lat, e.latlng.lng); editingIndex = -1; });
 
-    function initMap() {
-        map = new google.maps.Map(document.getElementById('map'), {
-            center: { lat: 23.6, lng: 121.0 }, // 台灣中心
-            zoom: 7
-        });
-        marker = new google.maps.Marker({ map: map, draggable: true });
-        
-        const input = document.getElementById('placeName');
-        autocomplete = new google.maps.places.Autocomplete(input);
-        autocomplete.addListener('place_changed', searchPlace);
-    }
-
-    function searchPlace() {
-        const place = autocomplete.getPlace();
-        if (!place || !place.geometry) {
-            const service = new google.maps.places.PlacesService(map);
-            service.findPlaceFromQuery({
-                query: document.getElementById('placeName').value,
-                fields: ['geometry', 'name']
-            }, (results, status) => {
-                if (status === google.maps.places.PlacesServiceStatus.OK) {
-                    updateMap(results[0].geometry.location);
+        function autoGeoSearch() {
+            const query = document.getElementById('curName').value;
+            if(!query) return;
+            document.getElementById('searchStatus').style.display = "block";
+            fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}`).then(r => r.json()).then(res => {
+                document.getElementById('searchStatus').style.display = "none";
+                if(res.length > 0) {
+                    const { lat, lon } = res[0];
+                    updatePosition(parseFloat(lat), parseFloat(lon));
+                    map.flyTo([lat, lon], 17);
                 }
             });
-            return;
         }
-        updateMap(place.geometry.location);
-    }
 
-    function updateMap(location) {
-        map.setCenter(location);
-        map.setZoom(15);
-        marker.setPosition(location);
-    }
+        function updatePosition(lat, lng) {
+            document.getElementById('curLat').value = lat;
+            document.getElementById('curLng').value = lng;
+            if(tempMarker) map.removeLayer(tempMarker);
+            tempMarker = L.circleMarker([lat, lng], { color: '#ff5722' }).addTo(map);
+        }
 
-    function addPoint() {
-        const name = document.getElementById('placeName').value;
-        const desc = document.getElementById('placeDesc').value;
-        const a = document.getElementById('optionA').value;
-        const b = document.getElementById('optionB').value;
-        const type = document.getElementById('pointType').value;
-        const pos = marker.getPosition();
+        function toggleFields() { document.getElementById('taskFields').style.display = document.getElementById('curType').value === 'task' ? 'block' : 'none'; }
 
-        if (!name || !pos) return alert("請先輸入地點並在地圖上定位！");
+        function addOrUpdatePoint() {
+            const lat = document.getElementById('curLat').value;
+            if(!lat) return alert("請先定位！");
+            const p = {
+                type: document.getElementById('curType').value,
+                lat: parseFloat(lat), lng: parseFloat(document.getElementById('curLng').value),
+                placeName: document.getElementById('curName').value, text: document.getElementById('curText').value,
+                optA: document.getElementById('optA').value, optB: document.getElementById('optB').value, answer: document.getElementById('ans').value
+            };
+            if (editingIndex > -1) { points[editingIndex] = p; editingIndex = -1; } 
+            else { points.push(p); }
+            renderList(); clearEditor();
+        }
 
-        const newPoint = { 
-            name, desc, optionA: a, optionB: b, type,
-            lat: pos.lat(), lng: pos.lng() 
-        };
-        
-        points.push(newPoint);
-        renderList();
-        clearForm();
-    }
-
-    function renderList() {
-        const list = document.getElementById('pointList');
-        list.innerHTML = '<h3>🚩 已設定的冒險路線</h3>';
-        points.forEach((p, index) => {
-            list.innerHTML += `
-                <div class="point-item" onclick="editPoint(${index})">
-                    <div class="point-info">
-                        <b>【${p.type}】${p.name}</b>
-                        <span>${p.desc.substring(0, 30)}...</span>
-                    </div>
-                    <button class="del-sub-btn" onclick="event.stopPropagation(); delPoint(${index})">刪除</button>
-                </div>
-            `;
-        });
-    }
-
-    function delPoint(index) {
-        points.splice(index, 1);
-        renderList();
-    }
-
-    function clearForm() {
-        document.getElementById('placeName').value = "";
-        document.getElementById('placeDesc').value = "";
-        document.getElementById('optionA').value = "";
-        document.getElementById('optionB').value = "";
-    }
-
-    async function saveToCloud() {
-        if (points.length === 0) return alert("目前沒有設定任何點位！");
-        
-        const password = prompt("請輸入管理員發布密碼：");
-        if (!password) return;
-
-        try {
-            const response = await fetch(GAS_URL, {
-                method: "POST",
-                body: JSON.stringify({ action: "saveGame", data: points, pwd: password })
+        function renderList() {
+            const list = document.getElementById('pointList'); list.innerHTML = "";
+            markers.forEach(m => map.removeLayer(m)); markers = [];
+            points.forEach((p, i) => {
+                const div = document.createElement('div'); div.className = 'point-item';
+                div.onclick = () => editPoint(i);
+                div.innerHTML = `<b>${i+1}. ${p.placeName}</b><button class="del-sub-btn" onclick="event.stopPropagation(); points.splice(${i},1); renderList();">刪除</button>`;
+                list.appendChild(div);
+                markers.push(L.marker([p.lat, p.lng]).addTo(map));
             });
-            const result = await response.json();
-            alert(result.message || "發布成功！");
-        } catch (e) {
-            alert("發布失敗，請檢查 GAS 權限或網址。");
         }
-    }
 
-    window.onload = initMap;
-</script>
+        function editPoint(i) {
+            editingIndex = i; const p = points[i];
+            document.getElementById('curName').value = p.placeName;
+            document.getElementById('curType').value = p.type;
+            document.getElementById('curText').value = p.text;
+            document.getElementById('optA').value = p.optA;
+            document.getElementById('optB').value = p.optB;
+            document.getElementById('ans').value = p.answer;
+            updatePosition(p.lat, p.lng); toggleFields();
+        }
 
-</body>
-</html>
+        function clearEditor() { 
+            // 修正：手動清空相關輸入框
+            ['curName', 'curText', 'optA', 'optB', 'curLat', 'curLng'].forEach(id => {
+                document.getElementById(id).value = "";
+            });
+            if(tempMarker) map.removeLayer(tempMarker); 
+        }
+
+        function loadExistingGame() {
+            const id = document.getElementById('customId').value;
+            if(!id) return alert("請輸入遊戲 ID");
+            fetch(`${gasUrl}?gameId=${id}`).then(r => r.json()).then(data => { points = data; renderList(); });
+        }
+
+        function publishGame() {
+            const id = document.getElementById('customId').value;
+            if(!id) return alert("請輸入遊戲 ID");
+            fetch(gasUrl, { method: 'POST', body: JSON.stringify({ action: "publish", customId: id, data: points }) })
+            .then(r => r.json()).then(() => alert("🚀 發布成功！"));
+        }
+    </script>
+</body></html>
