@@ -4,17 +4,59 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
-        body { margin: 0; background: #000; font-family: sans-serif; overflow: hidden; }
+        /* 基礎設定 */
+        body { margin: 0; background: #000; font-family: '微軟正黑體', sans-serif; overflow: hidden; }
         #map { width: 100vw; height: 100vh; }
+
+        /* 登入介面 - 修正對齊問題 */
         #loginOverlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.9); z-index: 2000; display: flex; align-items: center; justify-content: center; text-align: center; color: white; }
-        .login-card { background: #1a1a1a; padding: 30px; border: 3px solid #00d4ff; border-radius: 20px; width: 85%; max-width: 400px; }
-        .login-card input { width: 100%; padding: 15px; margin-bottom: 15px; border-radius: 10px; border: none; font-size: 20px; text-align: center; }
-        .btn-start { background: #00d4ff; color: #000; font-weight: bold; border: none; padding: 15px; cursor: pointer; border-radius: 10px; width: 100%; font-size: 18px; }
+        .login-card { background: #1a1a1a; padding: 40px 30px; border: 3px solid #00d4ff; border-radius: 25px; width: 85%; max-width: 400px; box-shadow: 0 0 30px rgba(0, 212, 255, 0.4); }
+        .login-card h1 { font-size: 28px; margin-bottom: 25px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+        
+        /* 修正後的輸入框 */
+        .login-card input { 
+            width: 100%; 
+            padding: 15px; 
+            margin-bottom: 15px; 
+            border-radius: 12px; 
+            border: none; 
+            font-size: 20px; 
+            text-align: center; 
+            background: #fff; 
+            color: #333;
+            box-sizing: border-box; /* 👈 關鍵修正：確保寬度包含 padding */
+            outline: none;
+        }
+
+        /* 修正後的按鈕 */
+        .btn-start { 
+            background: #00d4ff; 
+            color: #000; 
+            font-weight: bold; 
+            border: none; 
+            padding: 15px; 
+            cursor: pointer; 
+            border-radius: 12px; 
+            width: 100%; 
+            font-size: 20px;
+            box-sizing: border-box; /* 👈 關鍵修正：確保寬度包含 padding */
+            transition: 0.3s;
+        }
+        .btn-start:active { transform: scale(0.95); background: #fff; }
+
+        .demo-link { cursor: pointer; color: #00d4ff; margin-top: 20px; font-size: 15px; display: block; text-decoration: underline; }
+
+        /* 遊戲中 UI */
         #ui { position: absolute; top: 15px; width: 100%; z-index: 1000; display: flex; justify-content: center; pointer-events: none; }
-        #statusBar { background: rgba(0,0,0,0.85); color: #00d4ff; padding: 12px 20px; border: 2px solid #00d4ff; width: 85%; display: flex; justify-content: space-between; border-radius: 50px; font-size: 16px; pointer-events: auto; }
-        #dialog { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 1000; width: 92%; background: rgba(0,0,0,0.95); color: #fff; border: 3px solid #fff; padding: 20px; box-sizing: border-box; display: none; border-radius: 15px; }
-        .btn-box { display: flex; gap: 10px; margin-top: 15px; }
-        .btn { flex: 1; background: #333; color: #fff; border: 2px solid #fff; padding: 15px; cursor: pointer; font-size: 17px; border-radius: 10px; }
+        #statusBar { background: rgba(0,0,0,0.85); color: #00d4ff; padding: 12px 25px; border: 2px solid #00d4ff; width: 85%; display: flex; justify-content: space-between; border-radius: 50px; font-size: 16px; font-weight: bold; pointer-events: auto; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
+        
+        /* 對話框樣式 */
+        #dialog { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 1000; width: 92%; background: rgba(10,10,10,0.95); color: #fff; border: 3px solid #fff; padding: 25px; box-sizing: border-box; display: none; border-radius: 20px; box-shadow: 0 -10px 30px rgba(0,0,0,0.8); }
+        #dt { font-size: 19px; line-height: 1.6; margin-bottom: 20px; white-space: pre-wrap; }
+        .btn-box { display: flex; gap: 12px; }
+        .btn { flex: 1; background: #222; color: #fff; border: 2px solid #fff; padding: 16px; cursor: pointer; font-size: 18px; border-radius: 12px; font-family: inherit; transition: 0.2s; }
+        .btn:active { background: #fff; color: #000; }
+        .badge { display: inline-block; background: #ffeb3b; color: #000; padding: 4px 12px; border-radius: 6px; font-size: 13px; margin-bottom: 10px; font-weight: bold; }
     </style>
 </head><body>
 
@@ -23,15 +65,21 @@
             <h1>🎒 校外教學大考驗</h1>
             <input type="text" id="gameIdInput" placeholder="請輸入遊戲 ID">
             <button class="btn-start" onclick="loadGame()">開始考驗</button>
-            <p onclick="document.getElementById('gameIdInput').value='text001';loadGame()" style="cursor:pointer; color:#00d4ff; margin-top:15px; font-size:14px;">✨ 點我試玩 (text001)</p>
+            <span class="demo-link" onclick="quickDemo()">✨ 點我試玩 (text001)</span>
         </div>
     </div>
 
-    <div id="ui"><div id="statusBar"><span id="sc">⭐ 積分: 0</span><span id="pg">🏁 進度: 1/1</span></div></div>
+    <div id="ui">
+        <div id="statusBar">
+            <span id="sc">⭐ 積分: 0</span>
+            <span id="pg">🏁 進度: 載入中</span>
+        </div>
+    </div>
     <div id="map"></div>
 
     <div id="dialog">
-        <div id="dt" style="font-size:18px; line-height:1.6;"></div>
+        <div id="badgeTag" class="badge">系統訊息</div>
+        <div id="dt"></div>
         <div class="btn-box">
             <button id="bA" class="btn" onclick="tap('A')"></button>
             <button id="bB" class="btn" onclick="tap('B')"></button>
@@ -39,63 +87,123 @@
     </div>
 
     <script>
-        const gasUrl = 'https://script.google.com/macros/s/AKfycbzQZVw5zKIH1pgtJTZjEuk1o15y2Z1HsOfaDd1R3OGM-S9t5_rK2hFkJ6-Woii5DXdF/exec'; 
+        const gasUrl = 'https://script.google.com/macros/s/AKfycbzQZVw5zKIH1pgtJTZjEuk1o15y2Z1HsOfaDd1R3OGM-S9t5_rK2hFkJ6-Woii5DXdF/exec'; // 👈 記得填入您的 GAS 部署網址
+
         const map = L.map('map', { zoomControl: false }).setView([25.04, 121.51], 13);
         L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
         let gameSequence = [], currentIdx = 0, score = 0, perScore = 0, activeMarker = null;
 
+        function quickDemo() {
+            document.getElementById('gameIdInput').value = 'text001';
+            loadGame();
+        }
+
         function loadGame() {
             const id = document.getElementById('gameIdInput').value.trim();
-            if(!id) return;
-            fetch(`${gasUrl}?gameId=${id}`).then(r => r.json()).then(res => {
-                if(res.length > 0) {
-                    const start = res.find(n => n.type === 'start');
-                    const end = res.find(n => n.type === 'end');
-                    const tasks = res.filter(n => n.type === 'task').sort(() => Math.random() - 0.5);
-                    gameSequence = [start, ...tasks, end].filter(n => n);
-                    perScore = tasks.length > 0 ? Math.round(100/tasks.length) : 0;
+            if(!id) return alert("請輸入 ID！");
+            
+            fetch(`${gasUrl}?gameId=${id}`)
+            .then(r => r.json())
+            .then(res => {
+                if(res && res.length > 0) { 
+                    processData(res);
                     document.getElementById('loginOverlay').style.display = 'none';
-                    startStep();
-                } else { alert("找不到 ID"); }
-            });
+                    startStep(); 
+                } else {
+                    alert("找不到該 ID 的考驗資料！");
+                }
+            })
+            .catch(err => alert("連線失敗，請檢查網路或 GAS 設定。"));
+        }
+
+        function processData(rawData) {
+            // 分離起點、終點與任務
+            const startNode = rawData.find(n => n.type === 'start');
+            const endNode = rawData.find(n => n.type === 'end');
+            const taskNodes = rawData.filter(n => n.type === 'task');
+
+            // 隨機打散中間的任務
+            for (let i = taskNodes.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [taskNodes[i], taskNodes[j]] = [taskNodes[j], taskNodes[i]];
+            }
+
+            // 重新組合：起點 -> 隨機任務 -> 終點
+            gameSequence = [];
+            if(startNode) gameSequence.push(startNode);
+            gameSequence = gameSequence.concat(taskNodes);
+            if(endNode) gameSequence.push(endNode);
+
+            // 計算每題分數（總分100）
+            perScore = taskNodes.length > 0 ? Math.round(100 / taskNodes.length) : 0;
         }
 
         function startStep() {
             updateUI();
             if(activeMarker) map.removeLayer(activeMarker);
+
             const d = gameSequence[currentIdx];
             activeMarker = L.marker([d.lat, d.lng]).addTo(map);
-            map.flyTo([d.lat, d.lng], 17);
-            setTimeout(() => { openDialog(d); }, 1500);
+
+            // 地圖自動飛向目標
+            map.flyTo([d.lat, d.lng], 17, { animate: true, duration: 1.5 });
+
+            // 飛行結束後彈出對話
+            setTimeout(() => { 
+                openDialog(d); 
+                activeMarker.bindPopup(`<b>📍 第 ${currentIdx + 1} 站</b>`).openPopup();
+            }, 1600);
         }
 
         function openDialog(d) {
-            document.getElementById('dialog').style.display = 'block';
+            const dialog = document.getElementById('dialog');
+            const badge = document.getElementById('badgeTag');
+            dialog.style.display = 'block';
             document.getElementById('dt').innerText = d.text;
-            if(d.type === 'start') setBtns("出發！", null);
-            else if(d.type === 'task') setBtns("A. "+d.optA, "B. "+d.optB);
-            else if(d.type === 'end') {
-                document.getElementById('dt').innerText += `\n\n最終得分：${score} 分`;
-                setBtns("結束", null);
+            
+            if(d.type === 'start') {
+                badge.innerText = "🚩 考驗起點";
+                badge.style.background = "#4caf50";
+                setBtns("準備好了，出發！", null);
+            } else if(d.type === 'task') {
+                badge.innerText = "❓ 任務挑戰";
+                badge.style.background = "#ffeb3b";
+                setBtns("A. " + d.optA, "B. " + d.optB);
+            } else if(d.type === 'end') {
+                badge.innerText = "🏁 考驗終點";
+                badge.style.background = "#00d4ff";
+                document.getElementById('dt').innerText += `\n\n恭喜完成挑戰！\n本次得分：${score} 分`;
+                setBtns("結束考驗", null);
             }
         }
 
-        function setBtns(a, b) {
-            document.getElementById('bA').innerText = a;
-            document.getElementById('bB').style.display = b ? 'block' : 'none';
-            if(b) document.getElementById('bB').innerText = b;
+        function setBtns(txtA, txtB) {
+            document.getElementById('bA').innerText = txtA;
+            if(txtB) { 
+                document.getElementById('bB').style.display = 'block'; 
+                document.getElementById('bB').innerText = txtB; 
+            } else { 
+                document.getElementById('bB').style.display = 'none'; 
+            }
         }
 
         function tap(ans) {
             const d = gameSequence[currentIdx];
             if(d.type === 'task') {
-                if(ans === d.answer) { alert("答對了！"); score += perScore; }
-                else alert("答錯了！");
+                if(ans === d.answer) { alert("🌟 答對了！"); score += perScore; }
+                else { alert("🤔 答錯了，再接再厲！"); }
             }
+
             document.getElementById('dialog').style.display = 'none';
-            if(currentIdx < gameSequence.length - 1) { currentIdx++; startStep(); }
-            else { alert("挑戰結束！"); location.reload(); }
+
+            if(currentIdx < gameSequence.length - 1) {
+                currentIdx++;
+                startStep();
+            } else {
+                alert("感謝參加校外教學大考驗！");
+                location.reload();
+            }
         }
 
         function updateUI() {
