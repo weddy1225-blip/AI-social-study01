@@ -1,6 +1,6 @@
 <!DOCTYPE html><html lang="zh-TW"><head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🏆 校外教學大考驗</title>
+    <title id="pageTitle">🏆 校外教學大考驗</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
@@ -44,7 +44,7 @@
 
     <div id="loginOverlay">
         <div class="login-card">
-            <h1>🎒 校外教學大考驗</h1>
+            <h1 id="mainTitle">🎒 校外教學大考驗</h1>
             <input type="text" id="gameIdInput" placeholder="請輸入遊戲 ID">
             <button class="btn-start" onclick="loadGame()">開始考驗</button>
             <div class="demo-links">
@@ -82,6 +82,19 @@
         function loadGame() {
             const id = document.getElementById('gameIdInput').value.trim();
             if(!id) return alert("請輸入 ID！");
+
+            // --- 新增：ID 判斷與標題切換邏輯 ---
+            const mainTitle = document.getElementById('mainTitle');
+            const pageTitle = document.getElementById('pageTitle');
+            if (id === 'text002') {
+                mainTitle.innerHTML = "🌍 全臺旅遊大冒險";
+                pageTitle.innerText = "🌍 全臺旅遊大冒險";
+            } else {
+                mainTitle.innerHTML = "🎒 校外教學大考驗";
+                pageTitle.innerText = "🏆 校外教學大考驗";
+            }
+            // --------------------------------
+
             fetch(`${gasUrl}?gameId=${id}`).then(r => r.json()).then(res => {
                 if(res && res.length > 0) { 
                     processData(res);
@@ -112,10 +125,23 @@
             const dialog = document.getElementById('dialog');
             const badge = document.getElementById('badgeTag');
             dialog.style.display = 'block';
-            document.getElementById('dt').innerText = d.text;
-            if(d.type === 'start') { badge.innerText="🚩 起點"; setBtns("出發！", null); }
-            else if(d.type === 'task') { badge.innerText="❓ 任務"; setBtns("A. "+d.optA, "B. "+d.optB); }
-            else { badge.innerText="🏁 終點"; document.getElementById('dt').innerText += `\n得分：${score}`; setBtns("結束", null); }
+            
+            // 處理內容顯示，避免重複累加
+            let content = d.text;
+            if(d.type === 'start') { 
+                badge.innerText="🚩 起點"; 
+                setBtns("出發！", null); 
+            }
+            else if(d.type === 'task') { 
+                badge.innerText="❓ 任務"; 
+                setBtns("A. "+ (d.optA || ""), "B. "+ (d.optB || "")); 
+            }
+            else { 
+                badge.innerText="🏁 終點"; 
+                content += `\n\n🎯 本次冒險最終得分：${score} 分`; 
+                setBtns("重新挑戰", null); 
+            }
+            document.getElementById('dt').innerText = content;
         }
 
         function setBtns(a, b) {
