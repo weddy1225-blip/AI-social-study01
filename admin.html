@@ -11,12 +11,13 @@
         #map { flex: 1; z-index: 1; }
         #panel { width: 420px; padding: 25px; background: white; overflow-y: auto; box-shadow: -2px 0 15px rgba(0,0,0,0.1); z-index: 10; }
         
+        /* 步驟切換動畫 */
         .step-box { display: none; }
-        .step-box.active { display: block; animation: fadeIn 0.5s; }
+        .step-box.active { display: block; animation: fadeIn 0.4s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        h2 { color: #1a73e8; margin-top: 0; border-bottom: 2px solid #1a73e8; padding-bottom: 10px; }
-        .hint { font-size: 14px; color: #666; margin-bottom: 15px; line-height: 1.5; }
+        h2 { color: #1a73e8; margin-top: 0; border-bottom: 2px solid #1a73e8; padding-bottom: 10px; font-size: 22px; }
+        .hint { font-size: 14px; color: #666; margin-bottom: 20px; line-height: 1.6; background: #e8f0fe; padding: 10px; border-radius: 8px; border-left: 4px solid #1a73e8; }
         .control-group { background: #f8f9fa; padding: 15px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #dee2e6; }
         
         input, textarea, select { width: 100%; margin-bottom: 12px; padding: 12px; border: 1px solid #ced4da; border-radius: 8px; font-size: 15px; box-sizing: border-box; }
@@ -25,67 +26,77 @@
         .btn-primary { background: #1a73e8; color: white; }
         .btn-primary:hover { background: #1557b0; }
         .btn-outline { background: white; border: 2px solid #1a73e8; color: #1a73e8; }
-        .btn-success { background: #34a853; color: white; height: 60px; font-size: 18px; }
+        .btn-outline:hover { background: #f1f6ff; }
+        .btn-success { background: #34a853; color: white; height: 60px; font-size: 18px; margin-top: 20px; }
+        .btn-success:hover { background: #2d9249; }
         
+        /* 列表樣式 */
         .point-item { background: #fff; border: 1px solid #ddd; padding: 10px; margin-bottom: 5px; border-radius: 5px; font-size: 13px; display: flex; justify-content: space-between; align-items: center; }
-        .badge { background: #e8f0fe; color: #1a73e8; padding: 2px 8px; border-radius: 4px; font-size: 11px; margin-right: 5px; }
-        #searchStatus { color: #f4b400; font-weight: bold; font-size: 12px; display: none; }
+        .badge { background: #e8f0fe; color: #1a73e8; padding: 2px 8px; border-radius: 4px; font-size: 11px; margin-right: 5px; font-weight: bold; }
+        #searchStatus { color: #f4b400; font-weight: bold; font-size: 12px; display: none; margin-bottom: 5px; }
+        .current-id-tag { font-size: 12px; color: #555; background: #eee; padding: 5px 10px; border-radius: 20px; display: inline-block; margin-bottom: 10px; }
+        
+        /* 檢查中狀態 */
+        .loading-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.7); z-index:2000; display:none; align-items:center; justify-content:center; font-weight:bold; color:#1a73e8; }
     </style>
 </head>
 <body>
 
+    <div id="loading" class="loading-overlay">⏳ 正在檢查 ID 狀態，請稍候...</div>
+
     <div id="map"></div>
     <div id="panel">
-        <!-- Step 0: 入口 -->
         <div id="step0" class="step-box active">
-            <h2>🎒 歡迎使用遊戲編輯器</h2>
-            <p class="hint">這是一個引導式的工具，幫助您快速布置校外教學的互動路線。</p>
-            <button class="btn-primary" onclick="initNewGame()">🆕 建立全新遊戲 ID</button>
-            <div style="text-align: center; margin: 20px 0; color: #999;">— 或者 —</div>
-            <input type="text" id="customId" placeholder="輸入舊有遊戲 ID (例如: text001)">
+            <h2>🎒 路線與考題建立器</h2>
+            <p class="hint">老師您好！請先設定或輸入您的遊戲 ID，我們將引導您完成教學布置。</p>
+            <button class="btn-primary" onclick="initNewGame()">➕ 建立全新遊戲 ID</button>
+            <div style="text-align: center; margin: 20px 0; color: #999; font-size: 14px;">— 或者編輯舊有資料 —</div>
+            <input type="text" id="customId" placeholder="請輸入既有的遊戲 ID">
             <button class="btn-outline" onclick="loadExistingGame()">🔍 載入並編輯</button>
         </div>
 
-        <!-- Step 1: 起點設定 -->
         <div id="step1" class="step-box">
-            <h2>🚩 設定冒險起點</h2>
-            <p class="hint">請在地圖上點擊位置，或在下方搜尋起點名稱。</p>
-            <div id="searchStatus">正在定位中...</div>
-            <input type="text" id="startName" placeholder="起點名稱 (如: 學校大門口)" onchange="autoGeoSearch(this.value)">
+            <div class="current-id-tag">遊戲 ID: <span class="displayId"></span></div>
+            <h2>🚩 第一步：設定起點</h2>
+            <p class="hint">請在地圖上點擊位置，或搜尋名稱。這是學生開始冒險的地方。</p>
+            <div id="searchStatus">🔍 正在尋找座標...</div>
+            <input type="text" id="startName" placeholder="起點名稱 (如: 捷運站出口)" onchange="autoGeoSearch(this.value)">
             <textarea id="startText" rows="3" placeholder="想對學生說的開場白..."></textarea>
-            <button class="btn-primary" onclick="saveNode('start')">下一步：布置任務點</button>
+            <button class="btn-primary" onclick="saveNode('start')">儲存起點，開始布置任務點 →</button>
         </div>
 
-        <!-- Step 2: 任務點布置 -->
         <div id="step2" class="step-box">
-            <h2>❓ 布置任務考題</h2>
-            <p class="hint">您可以布置多個任務點，學生將以隨機順序前往這些地點。</p>
+            <div class="current-id-tag">遊戲 ID: <span class="displayId"></span></div>
+            <h2>❓ 第二步：布置任務考題</h2>
+            <p class="hint">布置完一個點後，請點擊下方的「儲存並新增下一個點」。</p>
             <div class="control-group">
-                <input type="text" id="taskName" placeholder="任務點名稱 (按 Enter 自動定位)" onchange="autoGeoSearch(this.value)">
-                <textarea id="taskText" rows="2" placeholder="請輸入考題或任務說明..."></textarea>
+                <input type="text" id="taskName" placeholder="任務地點名稱 (輸入後按 Enter)" onchange="autoGeoSearch(this.value)">
+                <textarea id="taskText" rows="2" placeholder="請輸入考題或觀察任務內容..."></textarea>
                 <div style="display: flex; gap: 10px;">
                     <input type="text" id="optA" placeholder="選項 A">
                     <input type="text" id="optB" placeholder="選項 B">
                 </div>
                 <select id="ans">
-                    <option value="A">正確答案：A</option>
-                    <option value="B">正確答案：B</option>
+                    <option value="A">正確答案是：A</option>
+                    <option value="B">正確答案是：B</option>
                 </select>
-                <button class="btn-outline" onclick="saveNode('task')">➕ 儲存並新增下一個點</button>
+                <button class="btn-outline" onclick="saveNode('task')">➕ 儲存此任務點</button>
             </div>
-            <h3>📍 已設定清單 (<span id="taskCount">0</span>)</h3>
+            
+            <h3>📍 已建立清單 (<span id="taskCount">0</span>)</h3>
             <div id="pointList"></div>
-            <button class="btn-primary" style="background:#673ab7" onclick="goToStep(3)">完成題目，設定終點 →</button>
+            
+            <button class="btn-primary" style="background:#673ab7; margin-top: 10px;" onclick="goToStep(3)">題目布置完了，設定終點 →</button>
         </div>
 
-        <!-- Step 3: 終點設定 -->
         <div id="step3" class="step-box">
-            <h2>🏁 設定冒險終點</h2>
-            <p class="hint">這是冒險的最後一站，請設定結語與最終位置。</p>
-            <input type="text" id="endName" placeholder="終點名稱" onchange="autoGeoSearch(this.value)">
-            <textarea id="endText" rows="3" placeholder="完成所有考驗後的結語..."></textarea>
+            <div class="current-id-tag">遊戲 ID: <span class="displayId"></span></div>
+            <h2>🏁 第三步：設定冒險終點</h2>
+            <p class="hint">設定學生最後集合的地點與過關結語。</p>
+            <input type="text" id="endName" placeholder="終點名稱 (如: 司令台、校門口)" onchange="autoGeoSearch(this.value)">
+            <textarea id="endText" rows="3" placeholder="學生完成所有任務後的結語..."></textarea>
             <button class="btn-success" onclick="publishGame()">🚀 發布並儲存遊戲</button>
-            <button class="btn-outline" style="border-color:#666; color:#666" onclick="goToStep(2)">回上一步修改題目</button>
+            <button class="btn-outline" style="border-color:#999; color:#666" onclick="goToStep(2)">← 返回修改題目</button>
         </div>
         
         <input type="hidden" id="curLat">
@@ -93,22 +104,21 @@
     </div>
 
     <script>
-        const gasUrl = '你的_GAS_部署網址'; // 請務必替換
+        // --- 核心設定區 ---
+        const gasUrl = '你的_GAS_部署網址'; 
+
         const map = L.map('map').setView([25.04, 121.51], 13);
         L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
         let points = [], markers = [], tempMarker = null;
 
-        // 地圖點擊事件
-        map.on('click', e => {
-            updatePosition(e.latlng.lat, e.latlng.lng);
-        });
+        map.on('click', e => { updatePosition(e.latlng.lat, e.latlng.lng); });
 
         function updatePosition(lat, lng) {
             document.getElementById('curLat').value = lat;
             document.getElementById('curLng').value = lng;
             if(tempMarker) map.removeLayer(tempMarker);
-            tempMarker = L.circleMarker([lat, lng], { color: '#ff5722', radius: 10 }).addTo(map);
+            tempMarker = L.circleMarker([lat, lng], { color: '#ff5722', fillOpacity: 0.5, radius: 10 }).addTo(map);
         }
 
         function autoGeoSearch(query) {
@@ -127,58 +137,104 @@
         function goToStep(step) {
             document.querySelectorAll('.step-box').forEach(el => el.classList.remove('active'));
             document.getElementById('step' + step).classList.add('active');
+            const currentId = document.getElementById('customId').value;
+            document.querySelectorAll('.displayId').forEach(el => el.innerText = currentId);
             if(tempMarker) map.removeLayer(tempMarker); 
+            map.invalidateSize();
         }
 
-        function initNewGame() {
-            let newId = "game" + Math.floor(Math.random() * 8999 + 1000);
-            document.getElementById('customId').value = newId;
-            alert("已為您建立新 ID: " + newId + "\n請記住此 ID，日後載入也是使用這組代碼。");
-            goToStep(1);
+        // --- Step 0: 建立新遊戲 (含重複檢查) ---
+        async function initNewGame() {
+            let newId = prompt("請設定您的遊戲 ID (例如：ZooTour2026)：", "");
+            
+            if (newId === null) return;
+            newId = newId.trim();
+            if (newId === "") return alert("ID 不能是空的！");
+
+            // 顯示載入動畫
+            document.getElementById('loading').style.display = "flex";
+
+            try {
+                const response = await fetch(`${gasUrl}?gameId=${newId}`);
+                const existingData = await response.json();
+
+                document.getElementById('loading').style.display = "none";
+
+                if (existingData && existingData.length > 0) {
+                    alert("⚠️ 該 ID [" + newId + "] 已經存在！\n請更換一個名稱，或是使用「載入並編輯」功能。");
+                } else {
+                    document.getElementById('customId').value = newId;
+                    alert("✅ ID [" + newId + "] 可以使用！\n請開始設定冒險起點。");
+                    points = []; // 初始化資料
+                    renderList();
+                    goToStep(1);
+                }
+            } catch (error) {
+                document.getElementById('loading').style.display = "none";
+                alert("連線檢查失敗，請確認 GAS 網址是否正確。");
+            }
         }
 
         function loadExistingGame() {
-            const id = document.getElementById('customId').value;
+            const id = document.getElementById('customId').value.trim();
             if(!id) return alert("請輸入 ID");
+            
             fetch(`${gasUrl}?gameId=${id}`).then(r => r.json()).then(data => {
-                if(data.length === 0) return alert("找不到此 ID 的資料，請檢查。");
+                if(data.length === 0) return alert("找不到此 ID 紀錄。");
                 points = data;
                 renderList();
+                const start = points.find(p => p.type === 'start');
+                if(start) {
+                    document.getElementById('startName').value = start.placeName;
+                    document.getElementById('startText').value = start.text;
+                }
+                const end = points.find(p => p.type === 'end');
+                if(end) {
+                    document.getElementById('endName').value = end.placeName;
+                    document.getElementById('endText').value = end.text;
+                }
                 goToStep(2);
-                alert("已成功載入舊有資料！您可以直接在 Step 2 進行修改。");
+                alert("舊資料載入完成！");
             });
         }
 
         function saveNode(type) {
             const lat = document.getElementById('curLat').value;
-            const name = (type === 'start') ? document.getElementById('startName').value : 
-                         (type === 'end') ? document.getElementById('endName').value : document.getElementById('taskName').value;
-            
-            if(!lat || !name) return alert("請確保地點已定位且有名稱！");
+            let name, text;
+            if(type === 'start') {
+                name = document.getElementById('startName').value;
+                text = document.getElementById('startText').value;
+            } else if(type === 'end') {
+                name = document.getElementById('endName').value;
+                text = document.getElementById('endText').value;
+            } else {
+                name = document.getElementById('taskName').value;
+                text = document.getElementById('taskText').value;
+            }
 
-            const p = {
+            if(!lat || !name) return alert("請先定位並輸入地點名稱！");
+
+            const newNode = {
                 type: type,
                 placeName: name,
                 lat: parseFloat(lat),
                 lng: parseFloat(document.getElementById('curLng').value),
-                text: (type === 'start') ? document.getElementById('startText').value :
-                      (type === 'end') ? document.getElementById('endText').value : document.getElementById('taskText').value,
+                text: text,
                 optA: document.getElementById('optA').value || "",
                 optB: document.getElementById('optB').value || "",
                 answer: document.getElementById('ans').value
             };
 
             if(type === 'start') {
-                points = points.filter(x => x.type !== 'start'); // 確保起點唯一
-                points.unshift(p);
+                points = points.filter(p => p.type !== 'start');
+                points.unshift(newNode);
                 goToStep(2);
-            } else if (type === 'end') {
-                points = points.filter(x => x.type !== 'end'); // 確保終點唯一
-                points.push(p);
-                alert("終點設定完成！可以發布了。");
+            } else if(type === 'end') {
+                points = points.filter(p => p.type !== 'end');
+                points.push(newNode);
+                alert("終點設定成功！");
             } else {
-                points.push(p);
-                // 清空任務輸入欄位
+                points.push(newNode);
                 ['taskName', 'taskText', 'optA', 'optB'].forEach(id => document.getElementById(id).value = "");
                 renderList();
             }
@@ -189,36 +245,38 @@
             list.innerHTML = "";
             markers.forEach(m => map.removeLayer(m));
             markers = [];
-            
-            let count = 0;
+            let taskCount = 0;
             points.forEach((p, i) => {
+                markers.push(L.marker([p.lat, p.lng]).addTo(map).bindPopup(p.placeName));
                 if(p.type === 'task') {
-                    count++;
+                    taskCount++;
                     const div = document.createElement('div');
                     div.className = 'point-item';
-                    div.innerHTML = `<span><span class="badge">任務 ${count}</span>${p.placeName}</span>
+                    div.innerHTML = `<span><span class="badge">任務 ${taskCount}</span> ${p.placeName}</span>
                                      <button style="width:auto; padding:4px 8px; background:#ff5252; color:white;" onclick="removePoint(${i})">刪除</button>`;
                     list.appendChild(div);
                 }
-                markers.push(L.marker([p.lat, p.lng]).addTo(map).bindPopup(p.placeName));
             });
-            document.getElementById('taskCount').innerText = count;
+            document.getElementById('taskCount').innerText = taskCount;
         }
 
-        function removePoint(i) {
-            points.splice(i, 1);
+        function removePoint(index) {
+            points.splice(index, 1);
             renderList();
         }
 
         function publishGame() {
-            const id = document.getElementById('customId').value;
-            if(points.length < 3) return alert("遊戲至少需要一個起點、一個任務點與一個終點！");
-            
-            fetch(gasUrl, { method: 'POST', body: JSON.stringify({ action: "publish", customId: id, data: points }) })
-            .then(r => r.json()).then(() => {
-                alert("🚀 遊戲發布成功！\n學生端請輸入 ID: " + id);
-                location.reload();
-            });
+            const id = document.getElementById('customId').value.trim();
+            if(points.filter(p=>p.type==='task').length === 0) return alert("請至少布置一個任務點！");
+            if(!points.some(p=>p.type==='end')) return alert("請先設定終點！");
+
+            if(confirm("確定要發布至 ID: [" + id + "] 嗎？")) {
+                fetch(gasUrl, { method: 'POST', body: JSON.stringify({ action: "publish", customId: id, data: points }) })
+                .then(r => r.json()).then(res => {
+                    alert("🚀 發布成功！");
+                    location.reload();
+                });
+            }
         }
     </script>
 </body>
