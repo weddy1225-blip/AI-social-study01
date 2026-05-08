@@ -1,107 +1,117 @@
-<!DOCTYPE html><html lang="zh-TW"><head>
-    <meta charset="UTF-8"><title>🛠️ 老師端 - 自動定位管理系統</title>
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🛠️ 老師端 - 引導式導覽建立器</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
-        body { font-family: '微軟正黑體', sans-serif; display: flex; height: 100vh; margin: 0; background: #f4f4f4; }
-        #map { flex: 1; }
-        #panel { width: 400px; padding: 20px; background: white; overflow-y: auto; box-shadow: -2px 0 10px rgba(0,0,0,0.1); }
-        .control-group { background: #eee; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #ddd; }
-        input, select, textarea, button { width: 100%; margin-bottom: 10px; padding: 12px; box-sizing: border-box; border-radius: 5px; border: 1px solid #ccc; }
-        button { cursor: pointer; border: none; font-weight: bold; }
-        .btn-add { background: #4caf50; color: white; }
-        .btn-pub { background: #00d4ff; color: black; font-size: 18px; height: 60px; margin-top: 10px; }
-        .btn-load { background: #ff9800; color: white; }
+        body { font-family: '微軟正黑體', sans-serif; display: flex; height: 100vh; margin: 0; background: #f0f2f5; }
+        #map { flex: 1; z-index: 1; }
+        #panel { width: 420px; padding: 25px; background: white; overflow-y: auto; box-shadow: -2px 0 15px rgba(0,0,0,0.1); z-index: 10; }
         
-        /* 修正後的點位項目樣式 */
-        .point-item { 
-            background: #fff; 
-            border: 1px solid #ddd; 
-            padding: 12px; 
-            margin-bottom: 8px; 
-            border-radius: 5px; 
-            cursor: pointer; 
-            position: relative; 
-            display: flex; 
-            align-items: flex-start;
-            min-height: 40px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        }
-        .point-item:hover { background: #f0f8ff; border-color: #2196f3; }
+        .step-box { display: none; }
+        .step-box.active { display: block; animation: fadeIn 0.5s; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        h2 { color: #1a73e8; margin-top: 0; border-bottom: 2px solid #1a73e8; padding-bottom: 10px; }
+        .hint { font-size: 14px; color: #666; margin-bottom: 15px; line-height: 1.5; }
+        .control-group { background: #f8f9fa; padding: 15px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #dee2e6; }
         
-        /* 讓標題文字自動換行，並避開右側按鈕 */
-        .point-item b { 
-            font-size: 14px; 
-            line-height: 1.4; 
-            flex: 1; 
-            padding-right: 50px; /* 給刪除按鈕留空間 */
-            word-break: break-all;
-        }
-
-        /* 修正刪除按鈕位置與大小 */
-        .del-sub-btn { 
-            position: absolute; 
-            right: 8px; 
-            top: 10px; 
-            background: #f44336; 
-            color: white; 
-            padding: 4px 8px; 
-            font-size: 11px; 
-            border-radius: 3px; 
-            width: auto; /* 覆蓋全域按鈕的 100% 寬度 */
-            margin-bottom: 0;
-            line-height: 1;
-        }
-        .del-sub-btn:hover { background: #d32f2f; }
-
-        .search-hint { font-size: 12px; color: #2196f3; display: none; margin-bottom: 5px; }
+        input, textarea, select { width: 100%; margin-bottom: 12px; padding: 12px; border: 1px solid #ced4da; border-radius: 8px; font-size: 15px; box-sizing: border-box; }
+        button { width: 100%; padding: 14px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; transition: 0.3s; font-size: 16px; margin-bottom: 10px; }
+        
+        .btn-primary { background: #1a73e8; color: white; }
+        .btn-primary:hover { background: #1557b0; }
+        .btn-outline { background: white; border: 2px solid #1a73e8; color: #1a73e8; }
+        .btn-success { background: #34a853; color: white; height: 60px; font-size: 18px; }
+        
+        .point-item { background: #fff; border: 1px solid #ddd; padding: 10px; margin-bottom: 5px; border-radius: 5px; font-size: 13px; display: flex; justify-content: space-between; align-items: center; }
+        .badge { background: #e8f0fe; color: #1a73e8; padding: 2px 8px; border-radius: 4px; font-size: 11px; margin-right: 5px; }
+        #searchStatus { color: #f4b400; font-weight: bold; font-size: 12px; display: none; }
     </style>
-</head><body>
+</head>
+<body>
 
     <div id="map"></div>
     <div id="panel">
-        <h2>🛠️ 路線管理控制台</h2>
-        <div class="control-group">
-            <label><b>1. 遊戲 ID 管理</b></label>
-            <input type="text" id="customId" placeholder="輸入遊戲 ID">
-            <button class="btn-load" onclick="loadExistingGame()">載入舊資料</button>
+        <!-- Step 0: 入口 -->
+        <div id="step0" class="step-box active">
+            <h2>🎒 歡迎使用遊戲編輯器</h2>
+            <p class="hint">這是一個引導式的工具，幫助您快速布置校外教學的互動路線。</p>
+            <button class="btn-primary" onclick="initNewGame()">🆕 建立全新遊戲 ID</button>
+            <div style="text-align: center; margin: 20px 0; color: #999;">— 或者 —</div>
+            <input type="text" id="customId" placeholder="輸入舊有遊戲 ID (例如: text001)">
+            <button class="btn-outline" onclick="loadExistingGame()">🔍 載入並編輯</button>
         </div>
 
-        <div class="control-group">
-            <label><b>2. 編輯點位</b></label>
-            <div id="searchStatus" class="search-hint">正在尋找地點座標...</div>
-            <input type="text" id="curName" placeholder="地點名稱 (輸入後按 Enter 自動定位)" onchange="autoGeoSearch()">
-            <select id="curType" onchange="toggleFields()">
-                <option value="start">🚩 冒險起點</option>
-                <option value="task">❓ 任務點</option>
-                <option value="end">🏁 冒險終點</option>
-            </select>
-            <textarea id="curText" placeholder="內容說明..." rows="3"></textarea>
-            <div id="taskFields" style="display:none;">
-                <input type="text" id="optA" placeholder="選項 A">
-                <input type="text" id="optB" placeholder="選項 B">
-                <select id="ans"><option value="A">答案 A</option><option value="B">答案 B</option></select>
+        <!-- Step 1: 起點設定 -->
+        <div id="step1" class="step-box">
+            <h2>🚩 設定冒險起點</h2>
+            <p class="hint">請在地圖上點擊位置，或在下方搜尋起點名稱。</p>
+            <div id="searchStatus">正在定位中...</div>
+            <input type="text" id="startName" placeholder="起點名稱 (如: 學校大門口)" onchange="autoGeoSearch(this.value)">
+            <textarea id="startText" rows="3" placeholder="想對學生說的開場白..."></textarea>
+            <button class="btn-primary" onclick="saveNode('start')">下一步：布置任務點</button>
+        </div>
+
+        <!-- Step 2: 任務點布置 -->
+        <div id="step2" class="step-box">
+            <h2>❓ 布置任務考題</h2>
+            <p class="hint">您可以布置多個任務點，學生將以隨機順序前往這些地點。</p>
+            <div class="control-group">
+                <input type="text" id="taskName" placeholder="任務點名稱 (按 Enter 自動定位)" onchange="autoGeoSearch(this.value)">
+                <textarea id="taskText" rows="2" placeholder="請輸入考題或任務說明..."></textarea>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="optA" placeholder="選項 A">
+                    <input type="text" id="optB" placeholder="選項 B">
+                </div>
+                <select id="ans">
+                    <option value="A">正確答案：A</option>
+                    <option value="B">正確答案：B</option>
+                </select>
+                <button class="btn-outline" onclick="saveNode('task')">➕ 儲存並新增下一個點</button>
             </div>
-            <input type="hidden" id="curLat"><input type="hidden" id="curLng">
-            <button class="btn-add" id="addBtn" onclick="addOrUpdatePoint()">加入 / 更新點位</button>
+            <h3>📍 已設定清單 (<span id="taskCount">0</span>)</h3>
+            <div id="pointList"></div>
+            <button class="btn-primary" style="background:#673ab7" onclick="goToStep(3)">完成題目，設定終點 →</button>
         </div>
 
-        <h3>📍 已設定清單</h3>
-        <div id="pointList"></div>
-        <button class="btn-pub" onclick="publishGame()">🚀 發布並儲存遊戲</button>
+        <!-- Step 3: 終點設定 -->
+        <div id="step3" class="step-box">
+            <h2>🏁 設定冒險終點</h2>
+            <p class="hint">這是冒險的最後一站，請設定結語與最終位置。</p>
+            <input type="text" id="endName" placeholder="終點名稱" onchange="autoGeoSearch(this.value)">
+            <textarea id="endText" rows="3" placeholder="完成所有考驗後的結語..."></textarea>
+            <button class="btn-success" onclick="publishGame()">🚀 發布並儲存遊戲</button>
+            <button class="btn-outline" style="border-color:#666; color:#666" onclick="goToStep(2)">回上一步修改題目</button>
+        </div>
+        
+        <input type="hidden" id="curLat">
+        <input type="hidden" id="curLng">
     </div>
 
     <script>
-        const gasUrl = 'https://script.google.com/macros/s/AKfycbzQZVw5zKIH1pgtJTZjEuk1o15y2Z1HsOfaDd1R3OGM-S9t5_rK2hFkJ6-Woii5DXdF/exec';
+        const gasUrl = '你的_GAS_部署網址'; // 請務必替換
         const map = L.map('map').setView([25.04, 121.51], 13);
         L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-        let points = [], markers = [], editingIndex = -1, tempMarker = null;
+        let points = [], markers = [], tempMarker = null;
 
-        map.on('click', e => { updatePosition(e.latlng.lat, e.latlng.lng); editingIndex = -1; });
+        // 地圖點擊事件
+        map.on('click', e => {
+            updatePosition(e.latlng.lat, e.latlng.lng);
+        });
 
-        function autoGeoSearch() {
-            const query = document.getElementById('curName').value;
+        function updatePosition(lat, lng) {
+            document.getElementById('curLat').value = lat;
+            document.getElementById('curLng').value = lng;
+            if(tempMarker) map.removeLayer(tempMarker);
+            tempMarker = L.circleMarker([lat, lng], { color: '#ff5722', radius: 10 }).addTo(map);
+        }
+
+        function autoGeoSearch(query) {
             if(!query) return;
             document.getElementById('searchStatus').style.display = "block";
             fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}`).then(r => r.json()).then(res => {
@@ -114,71 +124,102 @@
             });
         }
 
-        function updatePosition(lat, lng) {
-            document.getElementById('curLat').value = lat;
-            document.getElementById('curLng').value = lng;
-            if(tempMarker) map.removeLayer(tempMarker);
-            tempMarker = L.circleMarker([lat, lng], { color: '#ff5722' }).addTo(map);
-        }
-
-        function toggleFields() { document.getElementById('taskFields').style.display = document.getElementById('curType').value === 'task' ? 'block' : 'none'; }
-
-        function addOrUpdatePoint() {
-            const lat = document.getElementById('curLat').value;
-            if(!lat) return alert("請先定位！");
-            const p = {
-                type: document.getElementById('curType').value,
-                lat: parseFloat(lat), lng: parseFloat(document.getElementById('curLng').value),
-                placeName: document.getElementById('curName').value, text: document.getElementById('curText').value,
-                optA: document.getElementById('optA').value, optB: document.getElementById('optB').value, answer: document.getElementById('ans').value
-            };
-            if (editingIndex > -1) { points[editingIndex] = p; editingIndex = -1; } 
-            else { points.push(p); }
-            renderList(); clearEditor();
-        }
-
-        function renderList() {
-            const list = document.getElementById('pointList'); list.innerHTML = "";
-            markers.forEach(m => map.removeLayer(m)); markers = [];
-            points.forEach((p, i) => {
-                const div = document.createElement('div'); div.className = 'point-item';
-                div.onclick = () => editPoint(i);
-                div.innerHTML = `<b>${i+1}. ${p.placeName}</b><button class="del-sub-btn" onclick="event.stopPropagation(); points.splice(${i},1); renderList();">刪除</button>`;
-                list.appendChild(div);
-                markers.push(L.marker([p.lat, p.lng]).addTo(map));
-            });
-        }
-
-        function editPoint(i) {
-            editingIndex = i; const p = points[i];
-            document.getElementById('curName').value = p.placeName;
-            document.getElementById('curType').value = p.type;
-            document.getElementById('curText').value = p.text;
-            document.getElementById('optA').value = p.optA;
-            document.getElementById('optB').value = p.optB;
-            document.getElementById('ans').value = p.answer;
-            updatePosition(p.lat, p.lng); toggleFields();
-        }
-
-        function clearEditor() { 
-            // 修正：手動清空相關輸入框
-            ['curName', 'curText', 'optA', 'optB', 'curLat', 'curLng'].forEach(id => {
-                document.getElementById(id).value = "";
-            });
+        function goToStep(step) {
+            document.querySelectorAll('.step-box').forEach(el => el.classList.remove('active'));
+            document.getElementById('step' + step).classList.add('active');
             if(tempMarker) map.removeLayer(tempMarker); 
+        }
+
+        function initNewGame() {
+            let newId = "game" + Math.floor(Math.random() * 8999 + 1000);
+            document.getElementById('customId').value = newId;
+            alert("已為您建立新 ID: " + newId + "\n請記住此 ID，日後載入也是使用這組代碼。");
+            goToStep(1);
         }
 
         function loadExistingGame() {
             const id = document.getElementById('customId').value;
-            if(!id) return alert("請輸入遊戲 ID");
-            fetch(`${gasUrl}?gameId=${id}`).then(r => r.json()).then(data => { points = data; renderList(); });
+            if(!id) return alert("請輸入 ID");
+            fetch(`${gasUrl}?gameId=${id}`).then(r => r.json()).then(data => {
+                if(data.length === 0) return alert("找不到此 ID 的資料，請檢查。");
+                points = data;
+                renderList();
+                goToStep(2);
+                alert("已成功載入舊有資料！您可以直接在 Step 2 進行修改。");
+            });
+        }
+
+        function saveNode(type) {
+            const lat = document.getElementById('curLat').value;
+            const name = (type === 'start') ? document.getElementById('startName').value : 
+                         (type === 'end') ? document.getElementById('endName').value : document.getElementById('taskName').value;
+            
+            if(!lat || !name) return alert("請確保地點已定位且有名稱！");
+
+            const p = {
+                type: type,
+                placeName: name,
+                lat: parseFloat(lat),
+                lng: parseFloat(document.getElementById('curLng').value),
+                text: (type === 'start') ? document.getElementById('startText').value :
+                      (type === 'end') ? document.getElementById('endText').value : document.getElementById('taskText').value,
+                optA: document.getElementById('optA').value || "",
+                optB: document.getElementById('optB').value || "",
+                answer: document.getElementById('ans').value
+            };
+
+            if(type === 'start') {
+                points = points.filter(x => x.type !== 'start'); // 確保起點唯一
+                points.unshift(p);
+                goToStep(2);
+            } else if (type === 'end') {
+                points = points.filter(x => x.type !== 'end'); // 確保終點唯一
+                points.push(p);
+                alert("終點設定完成！可以發布了。");
+            } else {
+                points.push(p);
+                // 清空任務輸入欄位
+                ['taskName', 'taskText', 'optA', 'optB'].forEach(id => document.getElementById(id).value = "");
+                renderList();
+            }
+        }
+
+        function renderList() {
+            const list = document.getElementById('pointList');
+            list.innerHTML = "";
+            markers.forEach(m => map.removeLayer(m));
+            markers = [];
+            
+            let count = 0;
+            points.forEach((p, i) => {
+                if(p.type === 'task') {
+                    count++;
+                    const div = document.createElement('div');
+                    div.className = 'point-item';
+                    div.innerHTML = `<span><span class="badge">任務 ${count}</span>${p.placeName}</span>
+                                     <button style="width:auto; padding:4px 8px; background:#ff5252; color:white;" onclick="removePoint(${i})">刪除</button>`;
+                    list.appendChild(div);
+                }
+                markers.push(L.marker([p.lat, p.lng]).addTo(map).bindPopup(p.placeName));
+            });
+            document.getElementById('taskCount').innerText = count;
+        }
+
+        function removePoint(i) {
+            points.splice(i, 1);
+            renderList();
         }
 
         function publishGame() {
             const id = document.getElementById('customId').value;
-            if(!id) return alert("請輸入遊戲 ID");
+            if(points.length < 3) return alert("遊戲至少需要一個起點、一個任務點與一個終點！");
+            
             fetch(gasUrl, { method: 'POST', body: JSON.stringify({ action: "publish", customId: id, data: points }) })
-            .then(r => r.json()).then(() => alert("🚀 發布成功！"));
+            .then(r => r.json()).then(() => {
+                alert("🚀 遊戲發布成功！\n學生端請輸入 ID: " + id);
+                location.reload();
+            });
         }
     </script>
-</body></html>
+</body>
+</html>
